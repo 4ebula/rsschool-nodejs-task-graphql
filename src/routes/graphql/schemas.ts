@@ -11,6 +11,7 @@ import {
 } from 'graphql';
 import { UUIDType } from './types/uuid.js';
 import { PrismaClient } from '@prisma/client';
+import { MemberTypes, MemberTypesArgs, UserArgs } from './types/args.js';
 
 export const gqlResponseSchema = Type.Partial(
   Type.Object({
@@ -41,17 +42,29 @@ export const requestQueryType = new GraphQLObjectType({
       resolve: async () => await prisma.post.findMany(),
     },
     memberType: {
-      type: new GraphQLList(MemberType),
+      type: MemberType,
       args: {
         id: { type: new GraphQLNonNull(MemberTypeId) },
       },
-      resolve: async (_source, { id }) => {
-        console.log(id)
-        if (id) {
-          return await prisma.memberType.findFirst()
-        }
-        return await prisma.memberType.findMany();
-      },
+      resolve: async (_source, { id }: MemberTypesArgs) =>
+        await prisma.memberType.findFirst({
+          where: { id },
+        }),
+    },
+    memberTypes: {
+      type: new GraphQLList(MemberType),
+      resolve: async () => await prisma.memberType.findMany(),
+    },
+    user: {
+      type: User,
+      resolve: async (_source, { id }: UserArgs) =>
+        await prisma.user.findFirst({
+          where: { id },
+        }),
+    },
+    users: {
+      type: new GraphQLList(User),
+      resolve: async () => await prisma.user.findMany(),
     },
   }),
 });
@@ -59,7 +72,7 @@ export const requestQueryType = new GraphQLObjectType({
 export const PostsType = new GraphQLObjectType({
   name: 'Posts',
   fields: () => ({
-    id: { type: UUIDType },
+    id: { type: new GraphQLNonNull(UUIDType) },
     title: { type: GraphQLString },
     content: { type: GraphQLString },
     authorId: { type: UUIDType },
@@ -70,12 +83,12 @@ const MemberTypeId = new GraphQLEnumType({
   name: 'MemberTypeId',
   values: {
     basic: {
-      value: 'basic'
+      value: MemberTypes.Basic,
     },
     business: {
-      value: 'business'
+      value: MemberTypes.Business,
     },
-  }
+  },
 });
 
 export const MemberType = new GraphQLObjectType({
@@ -84,6 +97,15 @@ export const MemberType = new GraphQLObjectType({
     id: { type: MemberTypeId },
     discount: { type: GraphQLFloat },
     postsLimitPerMonth: { type: GraphQLFloat },
+  }),
+});
+
+const User = new GraphQLObjectType({
+  name: 'Users',
+  fields: () => ({
+    id: { type: new GraphQLNonNull(UUIDType) },
+    name: { type: GraphQLString },
+    balance: { type: GraphQLFloat },
   }),
 });
 
