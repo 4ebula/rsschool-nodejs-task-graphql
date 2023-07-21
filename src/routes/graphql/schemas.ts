@@ -8,6 +8,7 @@ import {
   GraphQLString,
   GraphQLEnumType,
   GraphQLNonNull,
+  GraphQLBoolean,
 } from 'graphql';
 import { UUIDType } from './types/uuid.js';
 import { PrismaClient } from '@prisma/client';
@@ -56,20 +57,24 @@ export const requestQueryType = new GraphQLObjectType({
       resolve: async () => await prisma.memberType.findMany(),
     },
     user: {
-      type: User,
+      type: UserType,
       resolve: async (_source, { id }: UserArgs) =>
         await prisma.user.findFirst({
           where: { id },
         }),
     },
     users: {
-      type: new GraphQLList(User),
+      type: new GraphQLList(UserType),
       resolve: async () => await prisma.user.findMany(),
+    },
+    profiles: {
+      type: new GraphQLList(ProfileType),
+      resolve: async () => await prisma.profile.findMany(),
     },
   }),
 });
 
-export const PostsType = new GraphQLObjectType({
+const PostsType = new GraphQLObjectType({
   name: 'Posts',
   fields: () => ({
     id: { type: new GraphQLNonNull(UUIDType) },
@@ -91,7 +96,7 @@ const MemberTypeId = new GraphQLEnumType({
   },
 });
 
-export const MemberType = new GraphQLObjectType({
+const MemberType = new GraphQLObjectType({
   name: 'MeberType',
   fields: () => ({
     id: { type: MemberTypeId },
@@ -100,7 +105,7 @@ export const MemberType = new GraphQLObjectType({
   }),
 });
 
-const User = new GraphQLObjectType({
+const UserType = new GraphQLObjectType({
   name: 'Users',
   fields: () => ({
     id: { type: new GraphQLNonNull(UUIDType) },
@@ -109,7 +114,18 @@ const User = new GraphQLObjectType({
   }),
 });
 
+const ProfileType = new GraphQLObjectType({
+  name: 'Profile',
+  fields: () => ({
+    id: { type: new GraphQLNonNull(UUIDType) },
+    isMale: { type: GraphQLBoolean },
+    yearOfBirth: { type: GraphQLInt },
+    userId: { type: UUIDType },
+    memberTypeId: { type: MemberType },
+  }),
+});
+
 export const schema = new GraphQLSchema({
   query: requestQueryType,
-  types: [PostsType, MemberType],
+  types: [PostsType, MemberType, UserType, ProfileType],
 });
