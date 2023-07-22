@@ -36,3 +36,23 @@ export interface UserData {
     balance: number;
   };
 }
+
+export interface PostPatchData {
+  id: UUID;
+  dto: { title: string };
+}
+
+export interface ProfilePatchData {
+  id: UUID;
+  dto: { isMale: boolean };
+}
+
+export interface UserPatchData {
+  id: UUID;
+  dto: { name: string };
+}
+
+export interface SubsPatchData {
+  userId: UUID;
+  authorId: UUID;
+}
