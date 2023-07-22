@@ -12,7 +12,7 @@ import {
 } from 'graphql';
 import { UUIDType } from './types/uuid.js';
 import { PrismaClient } from '@prisma/client';
-import { MemberTypes, MemberTypesArgs, UserArgs } from './types/args.js';
+import { MemberTypes, MemberTypesArgs, ArgsWithId } from './types/args.js';
 
 export const gqlResponseSchema = Type.Partial(
   Type.Object({
@@ -38,8 +38,18 @@ const prisma = new PrismaClient();
 export const requestQueryType = new GraphQLObjectType({
   name: 'Query',
   fields: () => ({
-    posts: {
+    post: {
       type: PostsType,
+      args: {
+        id: { type: new GraphQLNonNull(UUIDType) },
+      },
+      resolve: async (_source, { id }: ArgsWithId) =>
+        await prisma.post.findFirst({
+          where: { id },
+        }),
+    },
+    posts: {
+      type: new GraphQLList(PostsType),
       resolve: async () => await prisma.post.findMany(),
     },
     memberType: {
@@ -58,7 +68,10 @@ export const requestQueryType = new GraphQLObjectType({
     },
     user: {
       type: UserType,
-      resolve: async (_source, { id }: UserArgs) =>
+      args: {
+        id: { type: new GraphQLNonNull(UUIDType) },
+      },
+      resolve: async (_source, { id }: ArgsWithId) =>
         await prisma.user.findFirst({
           where: { id },
         }),
@@ -66,6 +79,16 @@ export const requestQueryType = new GraphQLObjectType({
     users: {
       type: new GraphQLList(UserType),
       resolve: async () => await prisma.user.findMany(),
+    },
+    profile: {
+      type: ProfileType,
+      args: {
+        id: { type: new GraphQLNonNull(UUIDType) },
+      },
+      resolve: async (_source, { id }: ArgsWithId) =>
+        await prisma.profile.findFirst({
+          where: { id },
+        }),
     },
     profiles: {
       type: new GraphQLList(ProfileType),
@@ -87,10 +110,10 @@ const PostsType = new GraphQLObjectType({
 const MemberTypeId = new GraphQLEnumType({
   name: 'MemberTypeId',
   values: {
-    basic: {
+    [MemberTypes.Basic]: {
       value: MemberTypes.Basic,
     },
-    business: {
+    [MemberTypes.Business]: {
       value: MemberTypes.Business,
     },
   },
@@ -105,12 +128,61 @@ const MemberType = new GraphQLObjectType({
   }),
 });
 
-const UserType = new GraphQLObjectType({
+const UserType: GraphQLObjectType = new GraphQLObjectType({
   name: 'Users',
   fields: () => ({
     id: { type: new GraphQLNonNull(UUIDType) },
     name: { type: GraphQLString },
     balance: { type: GraphQLFloat },
+    profile: {
+      type: ProfileType,
+      resolve: async ({ id: userId }: ArgsWithId) =>
+        await prisma.profile.findFirst({
+          where: { userId },
+        }),
+    },
+    posts: {
+      type: new GraphQLList(PostsType),
+      resolve: async ({ id: authorId }: ArgsWithId) => {
+        return await prisma.post.findMany({
+          where: { authorId },
+        });
+      },
+    },
+    userSubscribedTo: {
+      type: new GraphQLList(UserType),
+      resolve: async ({ id: subscriberId }: ArgsWithId) => {
+        const subs = await prisma.subscribersOnAuthors.findMany({
+          where: { subscriberId },
+        });
+        const subAuthorsIds = subs.map((sub) => sub.authorId);
+
+        return Promise.all(
+          subAuthorsIds.map((authorId) =>
+            prisma.user.findFirst({
+              where: { id: authorId },
+            }),
+          ),
+        );
+      },
+    },
+    subscribedToUser: {
+      type: new GraphQLList(UserType),
+      resolve: async ({ id: authorId }: ArgsWithId) => {
+        const subs = await prisma.subscribersOnAuthors.findMany({
+          where: { authorId },
+        });
+        const subIds = subs.map((sub) => sub.subscriberId);
+
+        return Promise.all(
+          subIds.map((subscriberId) =>
+            prisma.user.findFirst({
+              where: { id: subscriberId },
+            }),
+          ),
+        );
+      },
+    },
   }),
 });
 
@@ -121,11 +193,30 @@ const ProfileType = new GraphQLObjectType({
     isMale: { type: GraphQLBoolean },
     yearOfBirth: { type: GraphQLInt },
     userId: { type: UUIDType },
-    memberTypeId: { type: MemberType },
+    memberType: {
+      type: MemberType,
+      resolve: async ({ memberTypeId: id }: { memberTypeId: MemberTypes }) =>
+        await prisma.memberType.findFirst({
+          where: { id },
+        }),
+    },
+    memberTypeId: { type: MemberTypeId },
+  }),
+});
+
+const SubscriberType = new GraphQLObjectType({
+  name: 'Subscriber',
+  fields: () => ({
+    subscriber: { type: UserType },
+    subscriberId: { type: new GraphQLNonNull(UUIDType) },
+    author: { type: UserType },
+    authorId: { type: new GraphQLNonNull(UUIDType) },
+    subscribedToUser: { type: new GraphQLList(UserType) },
+    userSubscribedTo: { type: new GraphQLList(UserType) },
   }),
 });
 
 export const schema = new GraphQLSchema({
   query: requestQueryType,
-  types: [PostsType, MemberType, UserType, ProfileType],
+  types: [PostsType, MemberType, UserType, ProfileType, SubscriberType],
 });
