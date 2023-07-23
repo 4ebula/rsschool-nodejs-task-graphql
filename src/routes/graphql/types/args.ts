@@ -1,8 +1,13 @@
+import { PrismaClient } from '@prisma/client';
 import { UUID } from 'node:crypto';
 
 export enum MemberTypes {
   Basic = 'basic',
   Business = 'business',
+}
+
+export interface Context {
+  prisma: PrismaClient;
 }
 
 export interface MemberTypesArgs {
